@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { BarChart3, Table, FileText, Brain, LineChart, Settings, FlaskConical } from 'lucide-react'
+import { BarChart3, Table, FileText, Brain, LineChart, Settings, FlaskConical, GitBranch } from 'lucide-react'
 import CsvUploader from './components/CsvUploader'
 import StatsCards from './components/StatsCards'
 import Charts from './components/Charts'
@@ -7,6 +7,7 @@ import VideoTable from './components/VideoTable'
 import TranscriptPanel from './components/TranscriptPanel'
 import LlmPanel from './components/LlmPanel'
 import SettingsModal from './components/SettingsModal'
+import CannibalizationPanel from './components/CannibalizationPanel'
 import { parseCSV, computeStats } from './utils/metrics'
 import { getTranscripts, saveTranscripts, saveCsvSession, loadCsvSession, clearCsvSession } from './utils/storage'
 
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'table', label: 'Tabla', icon: Table },
   { id: 'transcripts', label: 'Transcripciones', icon: FileText },
   { id: 'llm', label: 'Análisis LLM', icon: Brain },
+  { id: 'cannibalization', label: 'Canibalización', icon: GitBranch },
 ]
 
 export default function App() {
@@ -268,6 +270,10 @@ export default function App() {
             videos={videos}
             onAnnotations={setAnnotations}
           />
+        )}
+
+        {activeTab === 'cannibalization' && (
+          <CannibalizationPanel videos={videos} />
         )}
       </main>
 

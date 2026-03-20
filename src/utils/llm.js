@@ -56,7 +56,7 @@ MÉTRICAS DISPONIBLES:
 - RPM ($): ingresos por mil visualizaciones
 
 FORMATO DE OUTPUT OBLIGATORIO:
-Devuelve el análisis en Markdown estructurado con las siguientes secciones:
+Devuelve el análisis en Markdown estructurado con las siguientes secciones EN ESTE ORDEN EXACTO. Las secciones accionables van primero; el detalle por vídeo va al final.
 
 ## DIAGNÓSTICO GENERAL DEL CANAL
 Resumen de 3-5 líneas con el estado del canal basado en los datos.
@@ -68,36 +68,9 @@ Para cada patrón: ejemplo con título + fragmento de transcripción + métrica 
 ### Lo que falla (retención baja)
 Para cada patrón: ejemplo con título + fragmento de transcripción + métrica + mecanismo de pérdida.
 
-## ANÁLISIS POR VÍDEO
-Para cada vídeo con transcripción:
-### [Título] — Retención: X% | ADV: X | CTR: X%
-- **Gancho (0-30s):** Evaluación del arranque con cita textual.
-- **Puntos de caída probables:** Señalar momentos donde la audiencia abandona, con cita y razón.
-- **Ganchos internos:** Evaluar si existen y su efectividad.
-- **Estructura:** Diagnóstico de la estructura del contenido.
-- **Veredicto:** Una línea con la causa raíz del rendimiento. Al final del veredicto, OBLIGATORIO incluir etiquetas de fallo en formato: \`FALLOS: [ETIQUETA1, ETIQUETA2]\` o \`FALLOS: Ninguno\`.
-
-## CORRELACIONES MÉTRICAS
-Relaciones observadas entre duración/retención, CTR/retención, tipo de gancho/ADV, etc.
-
-## RECOMENDACIONES ESTRUCTURALES
-Reglas concretas extraídas del análisis. Formato: SI [condición observada] → [resultado observado] → [acción recomendada].
-
-## ANOTACIONES PARA GRÁFICAS
-Devuelve un bloque JSON (dentro de un code block \`\`\`json) con anotaciones para superponer en las gráficas. Formato:
-[
-  {
-    "videoId": "xxx",
-    "type": "positive|negative|neutral",
-    "label": "Texto corto para la gráfica (máx 60 chars)",
-    "detail": "Explicación completa"
-  }
-]
-Incluye anotaciones para los 5 mejores y 5 peores vídeos como mínimo.
-
 ## DASHBOARD DE FALLOS
 
-Después de todos los análisis individuales, genera una tabla resumen con el conteo total de cada tipo de fallo detectado en el dataset:
+Tabla resumen con el conteo total de cada tipo de fallo detectado en el dataset:
 
 | Tipo de Fallo | Frecuencia | % del catálogo | Ret. media CON fallo | Ret. media SIN fallo | Impacto estimado |
 |---|---|---|---|---|---|
@@ -134,7 +107,42 @@ Agrupa los vídeos del dataset por el tipo de premisa/título que comparten. Det
 
 Después de la tabla, UNA línea de observación: cuál es la categoría con mejor rendimiento y por qué, y cuál con peor y por qué.
 
-Incluir una línea de observación después de la tabla: cuál es la categoría con mejor rendimiento y cuál con peor, y por qué (una frase por cada una).`
+## CORRELACIONES MÉTRICAS
+Relaciones observadas entre duración/retención, CTR/retención, tipo de gancho/ADV, etc.
+
+## RECOMENDACIONES ESTRUCTURALES
+Reglas concretas extraídas del análisis. Formato: SI [condición observada] → [resultado observado] → [acción recomendada].
+
+## ANÁLISIS POR VÍDEO — SELECCIÓN OBLIGATORIA
+
+NO analices todos los vídeos en detalle. Selecciona MÁXIMO 10 vídeos para análisis completo:
+- Los 5 con MEJOR retención del dataset
+- Los 5 con PEOR retención del dataset
+
+Para estos 10: análisis completo con el formato siguiente:
+### [Título] — Retención: X% | ADV: X | CTR: X%
+- **Gancho (0-30s):** Evaluación del arranque con cita textual.
+- **Puntos de caída probables:** Señalar momentos donde la audiencia abandona, con cita y razón.
+- **Ganchos internos:** Evaluar si existen y su efectividad.
+- **Estructura:** Diagnóstico de la estructura del contenido.
+- **Veredicto:** Una línea con la causa raíz del rendimiento. Al final del veredicto, OBLIGATORIO incluir etiquetas de fallo en formato: \`FALLOS: [ETIQUETA1, ETIQUETA2]\` o \`FALLOS: Ninguno\`.
+
+Para los vídeos restantes: incluirlos en las tablas agregadas (Dashboard de Fallos, Benchmarks, Correlaciones) con sus etiquetas de fallo, pero SIN análisis individual detallado. Listarlos al final del ANÁLISIS POR VÍDEO en una tabla resumen:
+
+| Título | Retención | CTR | Fallos detectados |
+|---|---|---|---|
+
+## ANOTACIONES PARA GRÁFICAS
+Devuelve un bloque JSON (dentro de un code block \`\`\`json) con anotaciones para superponer en las gráficas. Formato:
+[
+  {
+    "videoId": "xxx",
+    "type": "positive|negative|neutral",
+    "label": "Texto corto para la gráfica (máx 60 chars)",
+    "detail": "Explicación completa"
+  }
+]
+Incluye anotaciones para los 5 mejores y 5 peores vídeos como mínimo.`
 
 // ── Content-type specific blocks ─────────────────────────
 
@@ -283,8 +291,8 @@ function buildUserMessage(videos) {
 
   msg += '\n## Transcripciones\n\n'
   for (const v of withTranscript) {
-    const text = v.transcript.length > 4000
-      ? v.transcript.slice(0, 4000) + '... [truncado]'
+    const text = v.transcript.length > 2000
+      ? v.transcript.slice(0, 2000) + '... [truncado a primeros ~2min]'
       : v.transcript
     msg += `### ${v.title}\n\`\`\`\n${text}\n\`\`\`\n\n`
   }
@@ -364,4 +372,184 @@ export async function analyzeWithLLM(videos, onChunk, contentType = 'auto') {
     stream: true,
     onChunk,
   })
+}
+
+// ═══════════════════════════════════════════════════════════
+// CANNIBALIZATION ANALYSIS
+// ═══════════════════════════════════════════════════════════
+
+const CANNIBALIZATION_PROMPT = `Eres un analista de canibalización de contenido en YouTube. Tu trabajo es detectar cuándo un canal ha publicado múltiples vídeos con el mismo concepto narrativo subyacente y medir el impacto en el rendimiento.
+
+REGLAS:
+1. Todo el análisis en ESPAÑOL (España).
+2. Cada afirmación debe referenciar datos concretos del dataset.
+
+DEFINICIÓN DE CONCEPTO NUCLEAR:
+Un concepto nuclear es la mecánica narrativa del título reducida a una frase. No es el título literal — es la estructura subyacente. Dos títulos con palabras diferentes pueden tener el mismo concepto nuclear.
+
+Ejemplo: estos tres títulos tienen el MISMO concepto nuclear ("padre ofrece hermana bella, vampiro elige la rechazada"):
+- "GIVE HIM the BEAUTIFUL ONE," her FATHER SAID — BUT the VAMPIRE KING CHOSE the SISTER NOBODY WANTED
+- 'Take the PRETTY SISTER,' her father offered — but the VAMPIRE KING chose the ONE NO ONE WANTED
+- Her Mother Offered the Beautiful Daughter — The VAMPIRE KING Said: "I Didn't Cross CENTURIES for Her"
+
+PROCESO:
+1. Lee todos los títulos del dataset
+2. Agrupa los vídeos que comparten el mismo concepto nuclear. Sé estricto: variaciones cosméticas (cambiar nombres, adjetivos, orden de palabras) NO cuentan como concepto diferente
+3. Para cada cluster con 2+ vídeos, ordénalos por fecha de publicación
+4. Mide la degradación: cómo cambian views, retención y CTR entre la primera publicación y las siguientes del mismo concepto
+
+OUTPUT OBLIGATORIO:
+
+## CLUSTERS DE CONCEPTOS DUPLICADOS
+
+Para cada cluster con 2+ vídeos:
+
+### Concepto: [descripción del concepto nuclear en una frase]
+| # | Fecha | Título | Views | Retención | CTR | Degradación vs #1 |
+|---|---|---|---|---|---|---|
+| 1 | [fecha] | [título] | [views] | [ret%] | [ctr%] | — (original) |
+| 2 | [fecha] | [título] | [views] | [ret%] | [ctr%] | -X% views, -X pts ret |
+
+Observación: [una frase sobre el patrón de degradación]
+
+## CONCEPTOS SATURADOS (NO REUTILIZAR)
+
+Lista de conceptos nucleares que tienen 3+ ejecuciones O 2 ejecuciones con degradación >30% en views. Formato:
+- **[concepto nuclear]** — X ejecuciones, degradación total de -X% en views
+
+## CONCEPTOS DISPONIBLES
+
+Lista de conceptos que solo se han usado 1 vez Y tuvieron rendimiento superior a la mediana del canal. Estos son conceptos que funcionaron y no están agotados:
+- **[concepto nuclear]** — 1 ejecución, [views] views, [retención]% retención
+
+## RESUMEN DE CANIBALIZACIÓN
+
+| Métrica | Valor |
+|---|---|
+| Total de vídeos analizados | X |
+| Vídeos en clusters duplicados | X (X% del catálogo) |
+| Conceptos saturados (3+ usos) | X |
+| Estimación de views perdidas por canibalización | X |
+
+La estimación de views perdidas se calcula como la suma de: (views del primer vídeo de cada cluster - views de cada vídeo subsiguiente), solo para clusters donde hay degradación.`
+
+// Build simplified message for cannibalization (titles + metrics, no transcripts)
+function buildCannibalizationMessage(videos) {
+  let msg = 'Analizando ' + videos.length + ' vídeos para detección de canibalización de conceptos.\n\n'
+  msg += '## Catálogo completo del canal\n\n'
+  msg += '| Título | Fecha publicación | Views | Retención % | CTR % | Duración (s) |\n'
+  msg += '|--------|-------------------|-------|-------------|-------|--------------|\n'
+
+  for (const v of videos) {
+    msg += '| ' + v.title + ' | ' + v.pubDate + ' | ' + Math.round(v.views) + ' | ' + v.retention.toFixed(1) + ' | ' + v.ctr.toFixed(1) + ' | ' + v.duration + ' |\n'
+  }
+
+  return msg
+}
+
+// ── Cannibalization analysis function ────────────────────
+export async function analyzeCannibalization(videos, onChunk) {
+  const userMessage = buildCannibalizationMessage(videos)
+
+  return generateCompletion(CANNIBALIZATION_PROMPT, userMessage, {
+    maxTokens: 12000,
+    temperature: 0.4,
+    stream: true,
+    onChunk,
+  })
+}
+
+// ── Extract saturated concepts section ───────────────────
+export function extractSaturatedConcepts(markdown) {
+  const sectionMatch = markdown.match(/## CONCEPTOS SATURADOS[^\n]*\n([\s\S]*?)(?=\n## |$)/)
+  if (!sectionMatch) return null
+  return sectionMatch[1].trim()
+}
+
+// ── Extract structured cannibalization data ──────────────
+export function extractCannibalizationData(markdown) {
+  try {
+    // Extract clusters
+    const clusters = []
+    const clusterRegex = /### Concepto: ([^\n]+)\n([\s\S]*?)(?=\n### Concepto:|(?=\n## )|$)/g
+    let match
+    while ((match = clusterRegex.exec(markdown)) !== null) {
+      const concept = match[1].trim()
+      const block = match[2]
+
+      // Parse table rows
+      const tableLines = block.split('\n').filter(l => l.trim().startsWith('|'))
+      const videos = tableLines.slice(2).map(row => {
+        const cells = row.split('|').map(c => c.trim()).filter(c => c.length > 0)
+        if (cells.length < 7) return null
+        return {
+          title: cells[2] || '',
+          date: cells[1] || '',
+          views: parseInt(cells[3]) || 0,
+          retention: cells[4] || '',
+          ctr: cells[5] || '',
+          degradation: cells[6] || '',
+        }
+      }).filter(Boolean)
+
+      if (videos.length > 0) {
+        clusters.push({ concept, videos })
+      }
+    }
+
+    // Extract saturated concepts
+    const saturatedConcepts = []
+    const satSection = markdown.match(/## CONCEPTOS SATURADOS[^\n]*\n([\s\S]*?)(?=\n## |$)/)
+    if (satSection) {
+      const lines = satSection[1].split('\n').filter(l => l.trim().startsWith('-'))
+      for (const line of lines) {
+        const m = line.match(/\*\*(.+?)\*\*\s*—\s*(\d+)\s*ejecuciones?,\s*degradación.*?(-?[\d.]+)%/)
+        if (m) {
+          saturatedConcepts.push({
+            concept: m[1].trim(),
+            executions: parseInt(m[2]) || 0,
+            totalDegradation: m[3] + '%',
+          })
+        }
+      }
+    }
+
+    // Extract available concepts
+    const availableConcepts = []
+    const availSection = markdown.match(/## CONCEPTOS DISPONIBLES\s*\n([\s\S]*?)(?=\n## |$)/)
+    if (availSection) {
+      const lines = availSection[1].split('\n').filter(l => l.trim().startsWith('-'))
+      for (const line of lines) {
+        const m = line.match(/\*\*(.+?)\*\*\s*—\s*1 ejecución,\s*([\d,.]+)\s*views?,\s*([\d.]+)%\s*retención/)
+        if (m) {
+          availableConcepts.push({
+            concept: m[1].trim(),
+            views: parseInt(m[2].replace(/[,.]/g, '')) || 0,
+            retention: parseFloat(m[3]) || 0,
+          })
+        }
+      }
+    }
+
+    // Extract summary
+    let summary = null
+    const sumSection = markdown.match(/## RESUMEN DE CANIBALIZACIÓN\s*\n([\s\S]*?)(?=\n## |$)/)
+    if (sumSection) {
+      const text = sumSection[1]
+      const getVal = (label) => {
+        const m = text.match(new RegExp(label + '\\s*\\|\\s*([^|\\n]+)'))
+        return m ? m[1].trim() : ''
+      }
+      summary = {
+        totalVideos: getVal('Total de vídeos analizados'),
+        duplicatedVideos: getVal('Vídeos en clusters duplicados'),
+        saturatedConcepts: getVal('Conceptos saturados'),
+        estimatedLostViews: getVal('Estimación de views perdidas'),
+      }
+    }
+
+    return { clusters, saturatedConcepts, availableConcepts, summary }
+  } catch {
+    return null
+  }
 }
