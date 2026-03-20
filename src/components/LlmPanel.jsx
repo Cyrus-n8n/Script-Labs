@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { Brain, Copy, CheckCircle, Loader2, StopCircle, ClipboardList } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import { analyzeWithLLM, extractAnnotations, extractFaultDashboard, extractAntiFaultRules, cancelGeneration, CONTENT_TYPES } from '../utils/llm'
+import { analyzeWithLLM, extractAnnotations, extractFaultDashboard, extractAntiFaultRules, cancelGeneration, CONTENT_TYPES, MIN_TRANSCRIPTS } from '../utils/llm'
 import { getProviderSettings, findModelInfo, getCostColor } from '../utils/models'
 
 export default function LlmPanel({ videos, onAnnotations }) {
@@ -141,7 +141,7 @@ export default function LlmPanel({ videos, onAnnotations }) {
           ) : (
             <button
               onClick={handleAnalyze}
-              disabled={withMetrics.length === 0}
+              disabled={withTranscript.length < MIN_TRANSCRIPTS}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--color-accent)] text-white rounded-lg font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Brain size={16} />
@@ -167,6 +167,12 @@ export default function LlmPanel({ videos, onAnnotations }) {
             )}
           </span>
         </div>
+
+        {withTranscript.length < MIN_TRANSCRIPTS && !analyzing && (
+          <p className="mt-3 text-sm text-[var(--color-yellow)]">
+            Descarga transcripciones de al menos {MIN_TRANSCRIPTS} vídeos antes de lanzar el análisis. ({withTranscript.length}/{MIN_TRANSCRIPTS})
+          </p>
+        )}
 
         {error && (
           <p className={`mt-3 text-sm ${error.includes('cancelado') ? 'text-[var(--color-yellow)]' : 'text-[var(--color-red)]'}`}>

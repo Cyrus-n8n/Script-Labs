@@ -8,6 +8,8 @@ import { generateCompletion, cancelGeneration } from './api'
 // Re-export cancellation for LlmPanel
 export { cancelGeneration }
 
+export const MIN_TRANSCRIPTS = 5
+
 // ── Content type definitions (exported for UI) ───────────
 export const CONTENT_TYPES = [
   {
@@ -260,25 +262,27 @@ function buildAnalysisSystemPrompt(contentType) {
   return prompt
 }
 
-// ── Build user message with metrics + transcripts ────────
+// ── Build user message — only videos with transcript ─────
 function buildUserMessage(videos) {
-  let msg = '## Métricas del canal\n\n'
+  const withTranscript = videos.filter(v => v.transcript && v.transcript.trim())
+  const withoutTranscript = videos.length - withTranscript.length
+
+  let msg = `Analizando ${withTranscript.length} vídeos con transcripción de un catálogo total de ${videos.length} vídeos. Los ${withoutTranscript} vídeos sin transcripción no se incluyen en este análisis.\n\n`
+
+  msg += '## Métricas del canal\n\n'
   msg += '| Título | Views | ADV | Retención % | CTR % | Duración (s) | RPM | Impresiones | Ingresos |\n'
   msg += '|--------|-------|-----|-------------|-------|-------------|-----|-------------|----------|\n'
 
-  for (const v of videos) {
+  for (const v of withTranscript) {
     msg += `| ${v.title} | ${Math.round(v.views)} | ${v.adv.toFixed(1)} | ${v.retention.toFixed(1)} | ${v.ctr.toFixed(1)} | ${v.duration} | ${v.rpm.toFixed(2)} | ${Math.round(v.impressions)} | $${v.revenue.toFixed(2)} |\n`
   }
 
-  const withTranscript = videos.filter(v => v.transcript)
-  if (withTranscript.length > 0) {
-    msg += '\n## Transcripciones\n\n'
-    for (const v of withTranscript) {
-      const text = v.transcript.length > 4000
-        ? v.transcript.slice(0, 4000) + '... [truncado]'
-        : v.transcript
-      msg += `### ${v.title}\n\`\`\`\n${text}\n\`\`\`\n\n`
-    }
+  msg += '\n## Transcripciones\n\n'
+  for (const v of withTranscript) {
+    const text = v.transcript.length > 4000
+      ? v.transcript.slice(0, 4000) + '... [truncado]'
+      : v.transcript
+    msg += `### ${v.title}\n\`\`\`\n${text}\n\`\`\`\n\n`
   }
 
   return msg
@@ -340,7 +344,7 @@ export async function analyzeWithLLM(videos, onChunk, contentType = 'auto') {
   const userMessage = buildUserMessage(videos)
 
   return generateCompletion(systemPrompt, userMessage, {
-    maxTokens: 12000,
+    maxTokens: 16000,
     temperature: 0.6,
     stream: true,
     onChunk,
