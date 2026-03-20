@@ -25,7 +25,11 @@ function extractText(data) {
 
 async function fetchTranscript(videoId, lang) {
   const res = await fetch(`/api/transcript/api/transcript?videoId=${videoId}&lang=${lang}`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  if (!res.ok) {
+    let detail = ''
+    try { detail = await res.text() } catch {}
+    throw new Error(`HTTP ${res.status}${detail ? ': ' + detail.slice(0, 200) : ''}`)
+  }
   const data = await res.json()
   const text = extractText(data)
   if (!text) throw new Error('No transcript text found in response')

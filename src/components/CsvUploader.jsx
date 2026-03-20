@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { Upload, FileSpreadsheet } from 'lucide-react'
+import { Upload, FileSpreadsheet, FlaskConical } from 'lucide-react'
 
 export default function CsvUploader({ onFileLoaded }) {
   const [dragging, setDragging] = useState(false)
@@ -32,8 +32,9 @@ export default function CsvUploader({ onFileLoaded }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] px-4">
       <div className="mb-8 text-center">
-        <h1 className="text-4xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-          Script Lab
+        <h1 className="text-4xl font-bold mb-2 inline-flex items-center gap-3" style={{ fontFamily: 'var(--font-heading)' }}>
+          <FlaskConical size={36} className="text-[var(--color-accent)]" />
+          Script Labs
         </h1>
         <p className="text-[var(--color-text-dim)] text-lg">
           Análisis de retención y guiones de YouTube
