@@ -97,38 +97,42 @@ Incluye anotaciones para los 5 mejores y 5 peores vídeos como mínimo.
 
 ## DASHBOARD DE FALLOS
 
-Una tabla Markdown con el conteo total de cada tipo de fallo en el dataset:
+Después de todos los análisis individuales, genera una tabla resumen con el conteo total de cada tipo de fallo detectado en el dataset:
 
-| Tipo de Fallo | Frecuencia | Porcentaje del catálogo | Impacto medio en retención |
-|---|---|---|---|
-| FALLO-EJEMPLO | X | X% | -X puntos vs media |
+| Tipo de Fallo | Frecuencia | % del catálogo | Ret. media CON fallo | Ret. media SIN fallo | Impacto estimado |
+|---|---|---|---|---|---|
+| FALLO-DESCRIPCIÓN | X | X% | X% | X% | -X puntos |
 
-Ordenada de mayor a menor frecuencia. Solo incluir fallos que aparecen al menos 1 vez.
+Ordenar de mayor a menor frecuencia. Solo incluir fallos que aparecen al menos 1 vez. La columna "Impacto estimado" es la diferencia entre la retención media de vídeos CON ese fallo y la retención media de vídeos SIN ese fallo.
 
 ## REGLAS ANTI-FALLO PARA PRÓXIMO CONTENIDO
 
-Genera un bloque de texto formateado como instrucciones directas, basado en los fallos más frecuentes detectados en este análisis. El bloque debe ser copiable directamente en un brief de producción. Formato:
+Genera un bloque de texto formateado como instrucciones directas, listo para copiar y pegar en un brief de dirección narrativa. Basado en los 3 fallos más frecuentes y los 3 patrones de mayor retención detectados.
+
+El bloque DEBE estar envuelto en un bloque de código Markdown (triple backtick) para facilitar la copia:
 
 \`\`\`
 REGLAS ANTI-FALLO DERIVADAS DEL ANÁLISIS DE RETENCIÓN DEL CANAL:
 
-[Regla 1 basada en el fallo más frecuente]
-[Regla 2 basada en el segundo fallo más frecuente]
-[Regla 3 basada en el tercer fallo más frecuente]
-DURACIÓN MÁXIMA RECOMENDADA: [basada en correlación duración-retención del dataset]
-ENTREGA DE PROMESA DEL TÍTULO: antes del segundo [número basado en los datos de retención de los vídeos exitosos]
+[Regla 1: prohibición basada en el fallo más frecuente, con dato de impacto]
+[Regla 2: prohibición basada en el segundo fallo más frecuente]
+[Regla 3: prohibición basada en el tercer fallo más frecuente]
+[Regla 4: instrucción positiva basada en el patrón de mayor retención]
+[Regla 5: instrucción positiva basada en el segundo patrón]
+DURACIÓN MÁXIMA RECOMENDADA: [X palabras / X segundos, basado en correlación duración-retención]
+ENTREGA DE PROMESA DEL TÍTULO: antes de la palabra [número, basado en los vídeos con mejor retención]
 \`\`\`
 
-Máximo 6 reglas. Cada regla debe ser una instrucción ejecutable, no una observación.
+Máximo 8 reglas. Cada regla DEBE ser una instrucción ejecutable con dato de soporte. "PROHIBIDO flashback en los primeros 1.000 palabras (impacto: -8 puntos de retención)" es ejecutable. "Los flashbacks parecen afectar la retención" NO es ejecutable.
 
 ## BENCHMARKS POR CATEGORÍA DE TÍTULO
 
-Agrupa los vídeos del dataset por el tipo de título/premisa que comparten (detéctalo automáticamente por patrones en los títulos). Si hay vídeos que no encajan en ninguna categoría, agrúpalos como "Otros".
+Agrupa los vídeos del dataset por el tipo de premisa/título que comparten. Detecta las categorías automáticamente a partir de patrones en los títulos. Categorías típicas: "humillación pública + elección", "identidad oculta", "confrontación con diálogo directo", "confinamiento forzado", "error accidental", "protección sobrenatural", "reencuentro", etc.
 
-Para cada categoría:
-
-| Categoría | Vídeos | Retención media | CTR medio | ADV medio | Mejor vídeo | Peor vídeo |
+| Categoría | Nº Vídeos | Retención media | CTR medio | ADV medio | Mejor vídeo | Peor vídeo |
 |---|---|---|---|---|---|---|
+
+Después de la tabla, UNA línea de observación: cuál es la categoría con mejor rendimiento y por qué, y cuál con peor y por qué.
 
 Incluir una línea de observación después de la tabla: cuál es la categoría con mejor rendimiento y cuál con peor, y por qué (una frase por cada una).`
 
@@ -300,6 +304,7 @@ export function extractAnnotations(markdown) {
 }
 
 // ── Extract fault dashboard table as structured data ─────
+// Handles both 4-column (legacy) and 6-column (new) table formats
 export function extractFaultDashboard(markdown) {
   const sectionMatch = markdown.match(/## DASHBOARD DE FALLOS\s*\n([\s\S]*?)(?=\n## |$)/)
   if (!sectionMatch) return []
@@ -317,10 +322,20 @@ export function extractFaultDashboard(markdown) {
     const type = cells[0] || ''
     const frequency = parseInt(cells[1]) || 0
     const percentage = parseFloat(cells[2]) || 0
+
+    // 6-column format: Type | Freq | % | Ret WITH | Ret WITHOUT | Impact
+    if (cells.length >= 6) {
+      const avgRetentionWith = cells[3] || ''
+      const avgRetentionWithout = cells[4] || ''
+      const impactMatch = (cells[5] || '').match(/-?([\d.]+)/)
+      const retentionImpact = impactMatch ? -Math.abs(parseFloat(impactMatch[1])) : 0
+      return { type, frequency, percentage, avgRetentionWith, avgRetentionWithout, retentionImpact }
+    }
+
+    // 4-column fallback: Type | Freq | % | Impact
     const impactMatch = (cells[3] || '').match(/-?([\d.]+)/)
     const retentionImpact = impactMatch ? -Math.abs(parseFloat(impactMatch[1])) : 0
-
-    return { type, frequency, percentage, retentionImpact }
+    return { type, frequency, percentage, avgRetentionWith: '', avgRetentionWithout: '', retentionImpact }
   }).filter(Boolean)
 }
 
